@@ -1,0 +1,85 @@
+376: 
+377:     st.write("")
+378: 
+379:     # ── ROW 3: Input form (inside expander to keep dashboard first) ─
+380:     with st.expander("🔍  Enter Health Details & Run Prediction", expanded=True):
+381:         st.caption(
+382:             "Fill in your health details below and click **Run Prediction** "
+383:             "to receive your personalised risk assessment."
+384:         )
+385:         with st.form("health_form"):
+386: 
+387:         # ── Demographics ─────────────────────────────────────────
+388:         st.subheader("Demographics")
+389:         c1, c2 = st.columns(2)
+390:         age = c1.number_input(
+391:             "Age (years)", min_value=1, max_value=120, value=35,
+392:             help="Your current age in years"
+393:         )
+394:         sex = c2.selectbox(
+395:             "Biological Sex", ["Male", "Female"],
+396:             help="Required for accurate risk calculation"
+397:         )
+398: 
+399:         # ── Body measurements ─────────────────────────────────────
+400:         st.subheader("Body Measurements")
+401:         c3, c4 = st.columns(2)
+402:         bmi = c3.number_input(
+403:             "BMI (kg/m²)", min_value=10.0, max_value=80.0,
+404:             value=25.0, step=0.1,
+405:             help="Body Mass Index — weight(kg) / height(m)²"
+406:         )
+407:         weight = c4.number_input(
+408:             "Weight (kg)", min_value=20.0, max_value=300.0,
+409:             value=70.0, step=0.5
+410:         )
+411: 
+412:         # ── Blood and cardiovascular ──────────────────────────────
+413:         st.subheader("Blood & Cardiovascular Measurements")
+414:         c5, c6, c7 = st.columns(3)
+415:         glucose = c5.number_input(
+416:             "Glucose (mg/dL)", min_value=20, max_value=600, value=100,
+417:             help="Fasting blood glucose level"
+418:         )
+419:         blood_pressure = c6.number_input(
+420:             "Blood Pressure (mmHg)", min_value=40, max_value=300, value=120,
+421:             help="Systolic blood pressure"
+422:         )
+423:         cholesterol = c7.number_input(
+424:             "Cholesterol (mg/dL)", min_value=50, max_value=700, value=200,
+425:             help="Total cholesterol level"
+426:         )
+427: 
+428:         c8, c9 = st.columns(2)
+429:         heart_rate = c8.number_input(
+430:             "Heart Rate (bpm)", min_value=20, max_value=300, value=75,
+431:             help="Resting heart rate"
+432:         )
+433:         pregnancies = c9.number_input(
+434:             "Number of Pregnancies", min_value=0, max_value=20, value=0,
+435:             help="Total number of pregnancies. Enter 0 if not applicable."
+436:         )
+437: 
+438:         # ── Lifestyle ─────────────────────────────────────────────
+439:         st.subheader("Lifestyle Factors")
+440:         c10, c11 = st.columns(2)
+441:         smoking_status = c10.selectbox(
+442:             "Smoking Status", ["Non-Smoker", "Smoker"]
+443:         )
+444:         activity_level = c11.selectbox(
+445:             "Physical Activity Level",
+446:             ["Sedentary", "Light", "Moderate", "Active"],
+447:             help="Sedentary: little or no exercise.  Active: intense daily exercise."
+448:         )
+449: 
+450:         submitted = st.form_submit_button(
+451:                 "🔍  Run Prediction", use_container_width=True
+452:             )
+453: 
+454:     # ── Input validation & prediction (outside expander) ─────────
+455:     if submitted:
+456:         raw_inputs = {
+457:             "age":            age,
+458:             "bmi":            bmi,
+459:             "blood_pressure": blood_pressure,
+460:             "glucose":        glucose,

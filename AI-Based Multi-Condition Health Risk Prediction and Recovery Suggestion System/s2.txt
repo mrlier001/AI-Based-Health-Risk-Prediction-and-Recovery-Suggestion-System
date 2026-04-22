@@ -1,0 +1,240 @@
+461:             "cholesterol":    cholesterol,
+462:             "heart_rate":     heart_rate,
+463:         }
+464:         errors, warnings = validate_health_inputs(raw_inputs)
+465: 
+466:         if errors:
+467:             st.error("⚠️  Please correct the following before continuing:")
+468:             for msg in errors:
+469:                 st.write(f"\u2022 {msg}")
+470:             st.stop()
+471: 
+472:         if warnings:
+473:             st.warning("🟡  Some values are outside typical clinical ranges. You may continue, but please verify your readings.")
+474:             for msg in warnings:
+475:                 st.write(f"\u2022 {msg}")
+476: 
+477:         # Encode categorical fields
+478:         sex_val      = 1 if sex == "Male" else 0
+479:         smoking_val  = 1 if smoking_status == "Smoker" else 0
+480:         activity_val = {"Sedentary": 0, "Light": 1, "Moderate": 2, "Active": 3}[activity_level]
+481: 
+482:         # Build patient input dict with all dataset aliases
+483:         patient_input = {
+484:             "age": age, "bmi": bmi, "blood_pressure": blood_pressure,
+485:             "glucose": glucose, "cholesterol": cholesterol,
+486:             "heart_rate": heart_rate, "smoking_status": smoking_val,
+487:             "activity_level": activity_val, "sex": sex_val, "weight": weight,
+488:             # Diabetes aliases
+489:             "Pregnancies": pregnancies, "Glucose": glucose,
+490:             "BloodPressure": blood_pressure, "SkinThickness": 20,
+491:             "Insulin": 80, "BMI": bmi,
+492:             "DiabetesPedigreeFunction": 0.5, "Age": age,
+493:             # Heart disease aliases
+494:             "sex": sex_val, "cp": 0, "trestbps": blood_pressure,
+495:             "chol": cholesterol, "fbs": 1 if glucose > 120 else 0,
+496:             "restecg": 0, "thalach": heart_rate, "exang": 0,
+497:             "oldpeak": 1.0, "slope": 1, "ca": 0, "thal": 2,
+498:             # Hypertension aliases
+499:             "male": sex_val, "education": 2,
+500:             "currentSmoker": smoking_val,
+501:             "cigsPerDay": 10 if smoking_val else 0,
+502:             "BPMeds": 0, "prevalentStroke": 0,
+503:             "prevalentHyp": 1 if blood_pressure > 140 else 0,
+504:             "diabetes": 1 if glucose > 126 else 0,
+505:             "totChol": cholesterol, "sysBP": blood_pressure,
+506:             "diaBP": int(blood_pressure * 0.65), "heartRate": heart_rate,
+507:             # Stroke aliases
+508:             "hypertension": 1 if blood_pressure > 140 else 0,
+509:             "heart_disease": 0,
+510:             "ever_married": 1 if age > 30 else 0,
+511:             "avg_glucose_level": glucose, "systolic_bp": blood_pressure,
+512:         }
+513: 
+514:         # Run predictions
+515:         try:
+516:             with st.spinner("Analysing your health data..."):
+517:                 predictions = predict_all(patient_input)
+518:         except Exception:
+519:             st.error("⚠️  Prediction failed. Please check your inputs and try again.")
+520:             st.info("If this keeps happening, re-run: python src/train_model.py")
+521:             st.stop()
+522: 
+523:         # Build flat risks for recommendations
+524:         flat_risks = {}
+525:         for pred_key, rec_key in _REC_KEY.items():
+526:             res  = predictions.get(pred_key, {})
+527:             risk = res.get("risk")
+528:             flat_risks[rec_key] = risk if risk else "Unknown"
+529: 
+530:         try:
+531:             recommendations = get_all_recommendations(flat_risks)
+532:         except Exception:
+533:             recommendations = {}
+534:             st.warning("🟡  Recommendations could not be generated. Your prediction results are still shown below.")
+535: 
+536:         # Build summary for database
+537:         summary_lines = []
+538:         for rec_key, rec in recommendations.items():
+539:             summary_lines.append(f"{rec_key.upper()} - {rec.get('risk') or 'N/A'}")
+540:             for cat, tips in rec.get("suggestions", {}).items():
+541:                 for tip in tips:
+542:                     summary_lines.append(f"  {cat}: {tip}")
+543: 
+544:         # Save to database — failure is logged silently, does not block results
+545:         def _p(disease, key):
+546:             return predictions.get(disease, {}).get(key)
+547: 
+548:         _saved = False
+549:         try:
+550:             row_id = insert_prediction({
+551:                 "age": age, "bmi": bmi, "blood_pressure": blood_pressure,
+552:                 "glucose": glucose, "cholesterol": cholesterol,
+553:                 "heart_rate": heart_rate, "smoking_status": smoking_val,
+554:                 "activity_level": activity_val,
+555:                 _COL_DIAB_RISK:  _p("diabetes",     "risk"),
+556:                 _COL_DIAB_CONF:  _p("diabetes",     "confidence"),
+557:                 _COL_HEART_RISK: _p("heart",        "risk"),
+558:                 _COL_HEART_CONF: _p("heart",        "confidence"),
+559:                 _COL_HYP_RISK:   _p("hypertension", "risk"),
+560:                 _COL_HYP_CONF:   _p("hypertension", "confidence"),
+561:                 "recommendations_summary": "\n".join(summary_lines),
+562:             })
+563:             _saved = isinstance(row_id, int) and row_id > 0
+564:         except Exception:
+565:             pass  # Do not surface database errors — results are still shown
+566: 
+567:         # Store in session state for Tab 2
+568:         st.session_state["predictions"]     = predictions
+569:         st.session_state["recommendations"] = recommendations
+570: 
+571:         # ── Results Summary ───────────────────────────────────────
+572:         assessment_time = datetime.now().strftime("%d %b %Y  %H:%M")
+573: 
+574:         st.divider()
+575: 
+576:         # Header row: title on left, timestamp + save status on right
+577:         hc1, hc2 = st.columns([2, 1])
+578:         with hc1:
+579:             st.subheader("Assessment Results")
+580:             st.caption(
+581:                 "AI-based screening tool — not a substitute for medical advice."
+582:             )
+583:         with hc2:
+584:             st.write("")
+585:             st.caption(f"📅  {assessment_time}")
+586:             st.caption("💾  Saved to history" if _saved else "💾  Not saved")
+587: 
+588:         st.write("")
+589: 
+590:         # ── Section 1: Prediction results (4 cards) ───────────────
+591:         st.write("**Prediction Outcomes**")
+592:         result_cols = st.columns(len(DISEASE_LABELS))
+593:         for i, (disease, label) in enumerate(DISEASE_LABELS.items()):
+594:             with result_cols[i]:
+595:                 _show_risk_card(disease, label, predictions.get(disease, {}))
+596: 
+597:         st.write("")
+598: 
+599:         # ── Section 2: Key recommendations (one tip per condition) ─
+600:         if recommendations:
+601:             st.write("**Key Recommendations**")
+602:             rec_cols = st.columns(3)
+603:             rec_display = [
+604:                 ("diabetes",     "diabetes",     DISEASE_ICONS["diabetes"]),
+605:                 ("heart_disease","heart",        DISEASE_ICONS["heart"]),
+606:                 ("hypertension", "hypertension", DISEASE_ICONS["hypertension"]),
+607:             ]
+608:             for col, (rec_key, pred_key, icon) in zip(rec_cols, rec_display):
+609:                 rec   = recommendations.get(rec_key, {})
+610:                 label = DISEASE_LABELS.get(pred_key, rec_key.replace("_", " ").title())
+611:                 tips  = rec.get("suggestions", {}).get("diet", [])
+612:                 tip   = tips[0] if tips else "No recommendation available."
+613:                 with col:
+614:                     with st.container(border=True):
+615:                         st.caption(f"{icon}  {label}")
+616:                         st.write(tip)
+617: 
+618:         st.write("")
+619: 
+620:         # ── Section 3: Input summary (collapsible) ────────────────
+621:         with st.expander("📋  View Your Input Summary"):
+622:             sc1, sc2 = st.columns(2)
+623:             with sc1:
+624:                 st.metric("Age", f"{age} years")
+625:                 st.metric("BMI", f"{bmi} kg/m²")
+626:                 st.metric("Blood Pressure", f"{blood_pressure} mmHg")
+627:                 st.metric("Glucose", f"{glucose} mg/dL")
+628:             with sc2:
+629:                 st.metric("Cholesterol", f"{cholesterol} mg/dL")
+630:                 st.metric("Heart Rate", f"{heart_rate} bpm")
+631:                 st.metric("Smoking", "Yes" if smoking_val else "No")
+632:                 st.metric("Activity Level", activity_level)
+633: 
+634:         # ── Section 4: Download report ────────────────────────────
+635:         st.write("")
+636:         st.subheader("📄  Download Your Report")
+637:         st.caption("Save a copy of your results and recommendations as a text file.")
+638: 
+639:         report_lines = [
+640:             "=" * 60,
+641:             "  HEALTH RISK PREDICTION REPORT",
+642:             f"  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+643:             "=" * 60,
+644:             "",
+645:             "PATIENT INPUT",
+646:             "-" * 40,
+647:             f"  Age:            {age} years",
+648:             f"  BMI:            {bmi} kg/m2",
+649:             f"  Blood Pressure: {blood_pressure} mmHg",
+650:             f"  Glucose:        {glucose} mg/dL",
+651:             f"  Cholesterol:    {cholesterol} mg/dL",
+652:             f"  Heart Rate:     {heart_rate} bpm",
+653:             f"  Smoking:        {'Yes' if smoking_val else 'No'}",
+654:             f"  Activity Level: {activity_level}",
+655:             "",
+656:             "PREDICTION RESULTS",
+657:             "-" * 40,
+658:         ]
+659:         for disease, label in DISEASE_LABELS.items():
+660:             res  = predictions.get(disease, {})
+661:             risk = res.get("risk") or "Unavailable"
+662:             conf = f"{res['confidence']}%" if res.get("confidence") else "N/A"
+663:             report_lines.append(f"  {label:<20}: {risk:<12}  Confidence: {conf}")
+664: 
+665:         report_lines += ["", "PERSONALISED RECOMMENDATIONS", "-" * 40]
+666:         for rec_key, rec in recommendations.items():
+667:             label = rec_key.replace("_", " ").title()
+668:             risk  = rec.get("risk") or "N/A"
+669:             report_lines.append(f"\n  {label} ({risk})")
+670:             for cat, tips in rec.get("suggestions", {}).items():
+671:                 cat_label = CATEGORY_LABELS.get(cat, cat)
+672:                 report_lines.append(f"    {cat_label}:")
+673:                 for tip in tips:
+674:                     report_lines.append(f"      - {tip}")
+675: 
+676:         report_lines += [
+677:             "",
+678:             "=" * 60,
+679:             "  DISCLAIMER",
+680:             "  This report is generated by an AI-based screening tool.",
+681:             "  It is not a substitute for professional medical advice.",
+682:             "  Please consult a qualified healthcare professional.",
+683:             "=" * 60,
+684:         ]
+685: 
+686:         st.download_button(
+687:             label="⬇️  Download Full Report (.txt)",
+688:             data="\n".join(report_lines).encode("utf-8"),
+689:             file_name=f"health_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+690:             mime="text/plain",
+691:             use_container_width=True,
+692:         )
+693: 
+694:         st.write("")
+695:         st.info(
+696:             "💡  Use the sidebar to navigate to **Recommendations** "
+697:             "for the full personalised lifestyle advice for each condition."
+698:         )
+699: 
+700: 

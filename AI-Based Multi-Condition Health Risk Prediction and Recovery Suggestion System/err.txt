@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "c:\Users\S.S\OneDrive\Desktop\AI-Based Multi-Condition Health Risk Prediction and Recovery Suggestion System\testing_plan.py", line 75, in <module>
+    run("preprocess", "load_dataset returns DataFrame",
+  File "c:\Users\S.S\OneDrive\Desktop\AI-Based Multi-Condition Health Risk Prediction and Recovery Suggestion System\testing_plan.py", line 49, in run
+    print(f"  [{icon}] {tid}  {description}")
+  File "C:\Users\S.S\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 3: character maps to <undefined>

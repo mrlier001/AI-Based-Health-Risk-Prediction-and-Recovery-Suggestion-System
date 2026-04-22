@@ -1,0 +1,27 @@
+22 from src.predict         import predict_all, get_feature_importance
+96 except Exception:
+97     st.error(
+199 def _models_ready() -> bool:
+217                 st.warning("Unavailable")
+219                 st.error("⚠️ High Risk")
+221                 st.warning("🟡 Medium Risk")
+266 if not _models_ready():
+267     st.error("⚠️  Models have not been trained yet.")
+392             st.error("⚠️  Please correct the following before continuing:")
+398             st.warning("🟡  Please review the following unusual values:")
+446                 predictions = predict_all(patient_input)
+447         except Exception:
+448             st.error(
+456         flat_risks = {}
+460             flat_risks[rec_key] = risk if risk else f"Error: {res.get('error', 'unknown')}"
+463             recommendations = get_all_recommendations(flat_risks)
+464         except Exception:
+466             st.warning(
+499         except Exception:
+674                     st.warning(
+708         st.warning(
+836             st.warning(f"{disease_label}: This model could not be loaded. Please re-run training.")
+839             st.warning(f"{disease_label}: Model file not found. Please run the training script and refresh this page.")
+843             bundle = joblib.load(model_path)
+844         except Exception:
+845             st.warning(

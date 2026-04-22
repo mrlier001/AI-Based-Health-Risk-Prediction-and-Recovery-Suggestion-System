@@ -1,0 +1,24 @@
+FOUND at char 26486
+
+tf-8"),
+            file_name=f"health_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
+
+        # ── Section 5: Model Performance (compact, collapsed) ────
+        st.write("")
+        with st.expander("📈  Model Performance Summary", expanded=False):
+            st.caption(
+                "Best-performing algorithm per disease, evaluated on a "
+                "held-out test set (20% of data)."
+            )
+            _perf_rows = []
+            _perf_diseases = [
+                ("diabetes",     "🩸 Diabetes"),
+                ("heart",        "❤️ Heart Disease"),
+                ("hypertension", "💢 Hypertension"),
+            ]
+            for _dk, _dl in _perf_diseases:
+                _mp = Path(M
